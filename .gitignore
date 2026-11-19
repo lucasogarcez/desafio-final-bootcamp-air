@@ -6,6 +6,7 @@ venv/
 
 # Cache do Python
 __pycache__/
+.pytest_cache/
 
 # IDE
 .vscode/
