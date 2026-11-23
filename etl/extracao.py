@@ -71,7 +71,7 @@ def salvar_dados_brutos(dados: list[dict], caminho_arquivo: str) -> None:
     except OSError as erro_disco:
         raise ErroExtracao(f"Erro ao salvar arquivo {caminho_arquivo}: {erro_disco}")
 
-def executar_extracao() -> None:
+def executar_extracao() -> dict[str, list[dict]] | None:
     url_base = decouple.config("API_URL", default="http://127.0.0.1:8000")
     caminho_csv = decouple.config("PRODUTOS_CSV", default="insumos/dados/produtos.csv")
     pasta_destino = "brutos"
@@ -93,6 +93,7 @@ def executar_extracao() -> None:
             print(f"extracao: clientes paginas={pag_clientes} registros={len(clientes)}")
             print(f"extracao: pedidos paginas={pag_pedidos} registros_brutos={len(pedidos)}")
             
+        return {"clientes": clientes, "produtos": produtos, "pedidos": pedidos}
     except requests.exceptions.ConnectionError:
         print("Erro: não foi possível se conectar à API. Verifique se 'api_verdejar.py' está em execução")
     except requests.exceptions.Timeout:
@@ -102,3 +103,6 @@ def executar_extracao() -> None:
         print(f"Erro HTTP ({codigo_status}) ao verificar '/saude'")
     except ErroExtracao as erro:
         print(erro)
+        
+if __name__ == "__main__":
+    executar_extracao()
