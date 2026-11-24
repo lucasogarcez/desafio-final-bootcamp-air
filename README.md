@@ -34,11 +34,30 @@ consiente. O ETL aqui presentelida com todos.
 | A5 | Alguns pedidos aparecem repetidos (mesmo id e mesmo conteúdo) em páginas diferentes da API. | Carregar cada pedido uma única vez; rodar o ETL de novo não pode duplicar. |
 | A6 | Em parte dos pedidos, o valor total informado não bate com a soma dos itens. | Gravar os dois valores (valor_total e valor_itens), marcar a divergência na coluna divergente e relatar a quantidade. |
 
+### Caminho escolhido
+- Banco de dados: PostgreSQL
+- Biblioteca de conexão: `psycopg2`
+
 ## Como funciona
 - Extração: vem de arquivo API local [api_verdejar.py](insumos/api_verdejar.py).
 - Transformação: limpeza e padronização dos dados de `clientes.json`, `pedidos.json` e `produtos.csv` e cálculo de contadores, vide contrato de dados ([CONTRATO_DE_DADOS.md](CONTRATO_DE_DADOS.md)).
 - Carga: tabelas `clientes`, `produtos`, `pedidos`, `itens_pedido` em banco PostgreSQL.
-(Um diagrama simples em texto ou imagem ajuda.)
+
+## Estrutura do projeto
+```texto
+desafio-final/
+ README.md
+ COMO_USEI_IA.md
+ CONTRATO_DE_DADOS.md
+ consultas_validacao.sql
+ insumos/ (gerar_dados.py, api_verdejar.py, schema.sql, dados/)
+ etl/ (extracao.py, transformacao.py, carga.py, reconciliacao.py, main.py)
+ tests/ (test_transformacao.py, test_reconciliacao.py)
+ .env.example
+ requirements.txt
+ .gitignore
+```
+> O arquivo `reconciliacao.py` não constava na estrutura original, porém, foi adicionado com por motivos de responsabilidade, visto que se trata de uma auditoria e iria se misturar com outras responsabilidades se integrado em outro arquivo (como `carga.py`, por exemplo), organização clara na orquestação (`main.py`) como uma outra etapa e diferenças de exceção (exceções separadas levaram a melhores diagnósticos).
 
 ## Como executar o projeto localmente
 ### 1. Pré-Requisitos: 
@@ -84,10 +103,24 @@ psql -U postgres -d verdejar -f schema.sql
 ```
 ### 6. Executando ETL completo
 ```bash
+# Em outro terminal, execute a API
+python insumos/api_verdejar.py --porta 8000 --dados insumos/dados
+
+# Execute o ETL no terminal inicial
 python -m etl.main
 ```
 
 ## Testes
+
+### Como executar
+```bash
+python -m pytest
+```
+
+### Resultado esperado
+```bash
+===================================================================================== 72 passed in 0.23s ======================================================================================
+```
 
 ### Teste de idempotência (estratégia: recarga completa)
 Texto de saída do terminal ao realizar duas execuções seguidas, com as mesmas contagens:
@@ -115,10 +148,22 @@ Monday, November 23, 2026 6:35:26 PM
 > Parte do caminho absoluto do diretório foi anonimizado para fins de segurança e privacidade.
 
 ## Decisões e trade-offs
+Por que tipo `float`, com arredondamento por `round(..., 2)`, para números decimais?
+- O banco guarda em `NUMERIC`, por isso, o arredondamento e a tolerância de um centavo controlam o erro das somas.
 Por que exceções customizadas?
 - Em vez de capturar um `Exception` genérico (o que ocultaria bugs de desenvolvimento, como `TypeError`), o pipeline define exceções específicas (`ValorInvalidoError`, `ErroCarga`). Isso permite carregar dados estruturados do registro inválido (tabela, ID, campo e linha) e centraliza o encerramento controlado (`sys.exit(1)`) em um único ponto, desviando o orquestrador (`main.py`) de exceções de bibliotecas externas (`requests`, `psycopg2`).
 Por que recarga completa como estratégia de idempotência?
 - Garante idempotência total, produzindo sempre o mesmo resultado no banco e permite também correção de itens removidos ou alterados sem lógica complexa de `UPDATE`/`DELETE`. Em contrapartida, apaga todo o histório do banco a cada execução para reescrevê-lo por completo o que, em produção com alto volume de dados seria um problema, porém, a API local utilizada nesse projeto possui pequeno volume de dados, o que torna o tempo de reescrita do histório irrelevante.
+Por que o contador `divergentes` aparece junto aos de transformação e foi adicionado durante o desenvolvimento da reconciliação?
+- O contador já era implementado na etapa de transformação (`transformar_pedidos`), porém, sua exibição foi concretizada na etapa de reconciliação para respeitar a ordem do exemplo de saída especificado no desafio e agrupar os dois indicadores de auditoria (`reconciliacao` e `divergentes`), considerando que não é necessário recalcular o valor no banco.
+Porque utilizar, em `consultas_validacao.sql`, campo `valor_itens` como valor total de vendas ao invés de `valor_total`?
+- O `valor_itens` é calculado durante a transformação utilizando `quantidade` e `preco_unitario` (já tratados), o que garante maior segurança e confiabilidade aos dados retornados pelas consultas. Em contrapartida, utilizar `valor_total` seria depender de um campo talvez ainda não tratado, podendo conter valores negativos ou strings.
+
+### Fora do escopo
+| Caso | Por que está fora | O que o ETL faz se aparecer | Como confirmei |
+| --- | --- | --- | --- |
+| Valores negativos | nenhuma armadilha prevê, e o esquema não tem `CHECK` | carrega como veio | Em `brutos/pedidos.json` (seed 2026, 5100 registros brutos), contei os pedidos com `valor_total` menor que zero, depois de converter com `converter_valor`: 1 ocorrência. Teste `test_valor_total_negativo_carrega_sem_erro` prova que o ETL carrega como veio |
+| Pedido sem itens | nenhuma armadilha prevê, evita interrupção por único registro e em ciclo de vida do pedido este poderia ser registrado com status `cancelado` | carrega pedidos com lista de itens vazia (calculando `valor_itens = 0.0`) e interrompe a execução com `KeyError` caso a cahve `itens`esteja ausente | Em `brutos/pedidos.json`, contei pedidos com `itens` vazio ou ausente: 0 ocorrências. Testes `test_pedido_com_itens_vazio_carrega_com_valor_itens_zero` e `test_pedido_com_chave_itens_ausente_levanta_key_error` provam os comportamentos declarados. |
 
 ## Autor
 ### Lucas Oliveira Garcez
