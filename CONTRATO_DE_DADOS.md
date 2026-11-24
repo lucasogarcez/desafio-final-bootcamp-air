@@ -68,7 +68,7 @@
 Utilização do tipo `float` com `round(...,2)` pois o banco guarda em `NUMERIC`. O arredondamento e a tolerância de um centavo controlam o erro das somas.
 
 ### Valores inválidos:
-São determinados valores inválidos casos de: campo `estado` fora de 2 letras, data fora dos dois formatos (`DD/MM/AAAA` ou `AAAA-MM-DD`), `cliente_id` ou `produto_id` inexistente, valor não convertível. Sendo assim, é obrigatória a interrupção da execução no primeiro erro com lançamento de mensagem de erro, com formato: tabela, id, campo, valor. Para a tabela `itens_pedido`, que não tem campo `id`, substitui-se na mensagem por: `pedido_id` e `linha`.
+São determinados valores inválidos casos de: campo `estado` fora de 2 letras, data fora dos dois formatos (`DD/MM/AAAA` ou `AAAA-MM-DD`), `cliente_id` ou `produto_id` inexistente, valor não convertível e formatações das funções auxiliares (`tratar_email`, `padronizar_estado`, `converter_data`, `converter_valor`, `remove_pedidos_repetidos`, `calcular_itens_pedido`, `converter_produto_id`, `validar_cliente_id`, `validar_produto_id`). Sendo assim, é obrigatória a interrupção da execução no primeiro erro com lançamento de mensagem de erro, com formato: tabela, id, campo, valor. Para a tabela `itens_pedido`, que não tem campo `id`, substitui-se na mensagem por: `pedido_id` e `linha`.
 
 ### Ordem de transformação:
 1. Na tabela `pedidos`, remover duplicatas.
@@ -94,8 +94,11 @@ São determinados valores inválidos casos de: campo `estado` fora de 2 letras, 
 | `itens` | quantidade de itens encontrados em todos os pedidos lidos | durante a carga de dados no banco |
 | `soma_valor_itens_origem` | total da soma do valor dos itens de pedidos, com dados brutos | verificação de reconciliação dos dados |
 | `soma_valor_itens_destino` | total da soma do valor dos itens de pedidos, com dados enviados ao banco | verificação de reconciliação dos dados |
-| `diferenca` | total da diferença absoluta entre os campos `soma_valor_itens_origem` e `soma_valor_itens_destino`  | verificação de reconciliação dos dados |
-| `divergentes` | módulo da diferença `valor_total - valor_itens` maior que 0,01 | marcação de divergência |
+| `diferenca` | diferença absoluta entre `soma_valor_itens_origem` e `soma_valor_itens_destino`, ambos arredondados em 2 casas decimais, com o resultado final também arredondado em 2 casas decimais  | verificação de reconciliação dos dados |
+| `divergentes` | diferença absoluta entre `valor_total` e `valor_itens`, ambos arredondados em 2 casas decimais, com o resultado final também arredondado em 2 casas decimais. Considera-se divergente quanto o resultado é maior que 0,01 | marcação de divergência |
 
 ## Fora do escopo
-- 
+| Caso | Por que está fora | O que o ETL faz se aparecer | Como confirmei |
+| --- | --- | --- | --- |
+| Valores negativos | nenhuma armadilha prevê, e o esquema não tem `CHECK` | carrega como veio | Em `brutos/pedidos.json` (seed 2026, 5100 registros brutos), contei os pedidos com `valor_total` menor que zero, depois de converter com `converter_valor`: 1 ocorrência. Teste `test_valor_total_negativo_carrega_sem_erro` prova que o ETL carrega como veio |
+| Pedido sem itens | nenhuma armadilha prevê, evita interrupção por único registro e em ciclo de vida do pedido este poderia ser registrado com status `cancelado` | carrega pedidos com lista de itens vazia (calculando `valor_itens = 0.0`) e interrompe a execução com `KeyError` caso a cahve `itens`esteja ausente | Em `brutos/pedidos.json`, contei pedidos com `itens` vazio ou ausente: 0 ocorrências. Testes `test_pedido_com_itens_vazio_carrega_com_valor_itens_zero` e `test_pedido_com_chave_itens_ausente_levanta_key_error` provam os comportamentos declarados. |

@@ -113,7 +113,7 @@ def calcular_valor_itens(itens: list[dict]) -> float:
 def marcar_divergencia(valor_itens: float, valor_total: float) -> bool:
     """A6: retorna se o calculo da diferença absoluta entre valor_itens e valor_total,
     arredondados em 2 casas decimais, é maior que 1 centavo."""
-    return abs(round(valor_total, 2) - round(valor_itens, 2)) > 0.01
+    return round(abs(round(valor_total, 2) - round(valor_itens, 2)), 2) > 0.01
 
 def converter_produto_id(valor: str) -> int:
     """Converte o texto vindo do CSV em inteiro.
@@ -122,14 +122,14 @@ def converter_produto_id(valor: str) -> int:
         raise ValueError(f"Valor não é texto: {valor!r}")
     return int(valor.strip())
 
-def validar_cliente_id(cliente_id: int, ids_clientes: set[list]) -> int:
+def validar_cliente_id(cliente_id: int, ids_clientes: set[int]) -> int:
     if isinstance(cliente_id, bool) or not isinstance(cliente_id, int):
         raise ValueError(f"ID de cliente inválido: {cliente_id!r}")
     if cliente_id not in ids_clientes:
         raise ValueError(f"O ID do cliente ({cliente_id}) não existe na base de dados de clientes.")
     return cliente_id
 
-def validar_produto_id(produto_id:int, ids_produtos: set[list]) -> int:
+def validar_produto_id(produto_id:int, ids_produtos: set[int]) -> int:
     if isinstance(produto_id, bool) or not isinstance(produto_id, int):
         raise ValueError(f"ID de produto inválido: {produto_id!r}")
     if produto_id not in ids_produtos:
@@ -146,7 +146,7 @@ def transformar_clientes(clientes: list[dict]) -> dict[str, list[dict]] | dict[s
     for cliente in clientes:
         try:
             email = tratar_email(cliente["email"])
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="clientes", 
                 id=cliente["id"],
@@ -155,13 +155,13 @@ def transformar_clientes(clientes: list[dict]) -> dict[str, list[dict]] | dict[s
                 motivo=str(erro_original)
             ) from erro_original
             
-        if cliente["email"] is None:
+        if email is None:
             emails_nulos += 1
             
-        estado_original = cliente["estado"].strip()
         try:
+            estado_original = cliente["estado"].strip()
             estado_novo = padronizar_estado(cliente["estado"])
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="clientes",
                 id=cliente["id"],
@@ -208,12 +208,12 @@ def transformar_produtos(produtos: list[dict]) -> list[dict]:
         
         try:
             preco_base = converter_valor(produto["preco_base"])
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="produtos",
                 id=produto["produto_id"],
                 campo="preco_base",
-                valor=preco_base,
+                valor=produto["preco_base"],
                 motivo=str(erro_original)
             ) from erro_original
             
@@ -250,7 +250,7 @@ def transformar_pedidos(pedidos: list[dict], ids_clientes: list, ids_produtos: l
         # Validar "cliente_id" por pedido
         try:
             cliente_id = validar_cliente_id(pedido["cliente_id"], clientes_validos)
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="pedidos",
                 id=pedido_id,
@@ -278,7 +278,7 @@ def transformar_pedidos(pedidos: list[dict], ids_clientes: list, ids_produtos: l
             try:
                 qtd_convertida = converter_valor(item["quantidade"])
                 quantidade = int(qtd_convertida)
-            except ValueError as erro_original:
+            except (TypeError, ValueError) as erro_original:
                 raise ValorInvalidoError(
                     tabela="itens_pedido",
                     id=pedido_id,
@@ -290,7 +290,7 @@ def transformar_pedidos(pedidos: list[dict], ids_clientes: list, ids_produtos: l
                 
             try:
                 preco_unitario = converter_valor(item["preco_unitario"])
-            except ValueError as erro_original:
+            except (TypeError, ValueError) as erro_original:
                 raise ValorInvalidoError(
                     tabela="itens_pedido",
                     id=pedido_id,
@@ -312,7 +312,7 @@ def transformar_pedidos(pedidos: list[dict], ids_clientes: list, ids_produtos: l
         data_original = pedido["data_pedido"]
         try:
             data_obj = converter_data(data_original)
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="pedidos",
                 id=pedido_id,
@@ -327,7 +327,7 @@ def transformar_pedidos(pedidos: list[dict], ids_clientes: list, ids_produtos: l
         valor_total_original = pedido["valor_total"]
         try:
             valor_total = converter_valor(pedido["valor_total"])
-        except ValueError as erro_original:
+        except (TypeError, ValueError) as erro_original:
             raise ValorInvalidoError(
                 tabela="pedidos",
                 id=pedido_id,
@@ -387,6 +387,7 @@ def executar_transformacao(dados_brutos: dict[str, list[dict]]) -> dict[str, lis
         print(
             f"transformacao: emails_nulos={contadores_clientes["emails_nulos"]} estados_padronizados={contadores_clientes["estados_padronizados"]} datas_convertidas={contadores_pedidos["datas_convertidas"]} "
             f"\n\tvalores_convertidos={contadores_pedidos["valores_convertidos"]}"
+            f"\ndivergentes: {contadores_pedidos["divergentes"]} pedidos com valor_total diferente da soma dos itens"
         )
         
         return {"clientes": clientes_tratados, "produtos": produtos_tratados, "pedidos": res_pedidos["pedidos"], "itens": res_pedidos["itens"]}
