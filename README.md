@@ -64,7 +64,7 @@ desafio-final/
 Certifique-se de que tenha instalado Python 3.12 e PostgreSQL na sua máquina.
 ### 2. Clonando o Reposiório:
 ```bash
-git clone https://github.com/lucasogarcez/desafio-final-bootcamp-air
+git clone -b desafio-final-lucas https://github.com/lucasogarcez/desafio-final-bootcamp-air
 cd desafio-final-bootcamp-air
 ```
 ### 3. Configurando o Ambiente Virtual
@@ -146,6 +146,54 @@ Extração e transformação concluídos!
 Monday, November 23, 2026 6:35:26 PM
 ```
 > Parte do caminho absoluto do diretório foi anonimizado para fins de segurança e privacidade.
+
+## Resultados das Consultas de Validação (`consultas_validacao.sql`)
+### 1. Total de vendas por mês (`valor_itens`) e teste de consulta
+```text
+    mes     | total_vendas                                                                                                                                                                     
+------------+--------------
+ 2026-01-01 |     30355.02
+ 2026-02-01 |     33855.86
+ 2026-03-01 |     30617.70
+ 2026-04-01 |     31170.96
+ 2026-05-01 |     30777.02
+ 2026-06-01 |     31557.73
+ 2026-07-01 |     32685.17
+ 2026-08-01 |     29260.04
+ 2026-09-01 |     29909.71
+ 2026-10-01 |     31039.54
+```
+
+- Soma geral dos meses: 311228.75
+- Total geral da tabela (`SELECT COALESCE(SUM(valor_itens), 0) FROM pedidos`): 311228.75
+- Diferença: 0.00
+
+### 2. Quantidade de pedidos por estado
+```text
+estado | quantidade_pedidos                                                                                                                                                                   
+--------+--------------------
+ RS     |               1543
+ SC     |               1127
+ PR     |                974
+ SP     |                880
+ MG     |                476
+```
+
+### 3. Pedidos divergentes
+- Total de registros retornados: 238 pedidos
+- Amostra das primeiras linhas retornadas pela consulta:
+```text
+id  | valor_total | valor_itens | diferenca                                                                                                                                                  
+------+-------------+-------------+-----------
+    1 |      125.84 |      130.84 |      5.00
+   51 |       26.58 |       23.58 |      3.00
+   71 |      144.35 |      134.35 |     10.00
+   81 |       -1.84 |        3.16 |      5.00
+  106 |       47.78 |       44.78 |      3.00
+  176 |      137.69 |      134.69 |      3.00
+  186 |      143.51 |      133.51 |     10.00
+  289 |       79.40 |       76.40 |      3.00
+```
 
 ## Decisões e trade-offs
 Por que tipo `float`, com arredondamento por `round(..., 2)`, para números decimais?
