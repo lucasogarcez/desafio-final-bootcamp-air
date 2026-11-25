@@ -1,0 +1,15 @@
+# Variáveis de ambiente
+.env
+
+# Ambiente virtual
+venv/
+
+# Cache do Python
+__pycache__/
+.pytest_cache/
+
+# IDE
+.vscode/
+
+# Dados extraídos
+brutos/
